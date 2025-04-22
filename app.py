@@ -20,7 +20,7 @@ app.config['CACHE_TYPE'] = 'SimpleCache'
 cache = Cache(app)
 
 model_path = "tetianamohorian/hate_speech_model"
-
+HISTORY_FILE = "history.json"
 
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 model = AutoModelForSequenceClassification.from_pretrained(model_path)
@@ -53,13 +53,34 @@ def predict():
         
         cache.set(text_hash, prediction_label)
         
+        entry = {
+            "text": text,
+            "prediction": prediction_label,
+            "timestamp": datetime.now().isoformat()
+        }
+        
         response = app.response_class(
             response=json.dumps({"prediction": prediction_label}, ensure_ascii=False),
             status=200,
             mimetype="application/json"
         )
         
-        
+        entry = {
+            "text": text,
+            "prediction": prediction_label,
+            "timestamp": datetime.now().isoformat()
+        }
+
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        else:
+            history = []
+
+        history.append(entry)
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+
 
 
         return response
