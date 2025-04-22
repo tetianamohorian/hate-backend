@@ -32,7 +32,7 @@ def save_to_history(text, prediction_label):
     entry = {
         "text": text,
         "prediction": prediction_label,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().strftime("%d.%m.%Y %H:%M:%S")
     }
 
     if os.path.exists(HISTORY_FILE):
