@@ -72,6 +72,21 @@ def predict():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# ✅ Новый маршрут: вернуть историю анализа
+@app.route("/api/history", methods=["GET"])
+def get_history():
+    try:
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                history = json.load(f)
+            return jsonify(history), 200
+        else:
+            return jsonify([]), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
