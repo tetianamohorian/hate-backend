@@ -1,5 +1,3 @@
-
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import json
@@ -9,8 +7,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from flask_caching import Cache
 import hashlib
 
-import time
-
+from datetime import datetime
 import os
 
 app = Flask(__name__)
@@ -30,6 +27,23 @@ model.eval()
 def generate_text_hash(text):
     return hashlib.md5(text.encode('utf-8')).hexdigest()
 
+def save_to_history(text, prediction_label):
+    entry = {
+        "text": text,
+        "prediction": prediction_label,
+        "timestamp": datetime.now().isoformat()
+    }
+
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            history = json.load(f)
+    else:
+        history = []
+
+    history.append(entry)
+    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
+
 @app.route("/api/predict", methods=["POST"])
 def predict():
     try:
@@ -39,55 +53,25 @@ def predict():
         text_hash = generate_text_hash(text)
         cached_result = cache.get(text_hash)
         if cached_result:
+            save_to_history(text, cached_result)
             return jsonify({"prediction": cached_result}), 200
 
-
         inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
-
 
         with torch.no_grad():
             outputs = model(**inputs)
             predictions = torch.argmax(outputs.logits, dim=1).item()
-        
+
         prediction_label = "Pravdepodobne toxický" if predictions == 1 else "Neutrálny text"
-        
         cache.set(text_hash, prediction_label)
-        
-        entry = {
-            "text": text,
-            "prediction": prediction_label,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-        response = app.response_class(
-            response=json.dumps({"prediction": prediction_label}, ensure_ascii=False),
-            status=200,
-            mimetype="application/json"
-        )
-        
-        entry = {
-            "text": text,
-            "prediction": prediction_label,
-            "timestamp": datetime.now().isoformat()
-        }
 
-        if os.path.exists(HISTORY_FILE):
-            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                history = json.load(f)
-        else:
-            history = []
+        save_to_history(text, prediction_label)
 
-        history.append(entry)
-        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(history, f, ensure_ascii=False, indent=2)
+        return jsonify({"prediction": prediction_label}), 200
 
-
-
-        return response
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
