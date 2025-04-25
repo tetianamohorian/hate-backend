@@ -6,10 +6,11 @@ import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from flask_caching import Cache
 import hashlib
-
+import re
 from datetime import datetime
 import os
 from flask import Response
+import pytz
 
 app = Flask(__name__)
 CORS(app)
@@ -28,11 +29,16 @@ model.eval()
 def generate_text_hash(text):
     return hashlib.md5(text.encode('utf-8')).hexdigest()
 
+def get_current_time():
+    tz = pytz.timezone('Europe/Bratislava')
+    now = datetime.now(tz)
+    return now.strftime("%d.%m.%Y %H:%M:%S")
+
 def save_to_history(text, prediction_label):
     entry = {
         "text": text,
         "prediction": prediction_label,
-        "timestamp": datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+        "timestamp": get_current_time()
     }
 
     if os.path.exists(HISTORY_FILE):
@@ -51,6 +57,14 @@ def predict():
         data = request.json
         text = data.get("text", "")
 
+        if not text:
+            return jsonify({"error": "Text nesmie byť prázdny."}), 400
+        if len(text) > 512:
+            return jsonify({"error": "Text je príliš dlhý. Maximálne 512 znakov."}), 400
+        if re.search(r"[а-яА-ЯёЁ]", text):
+            return jsonify({"error": "Text nesmie obsahovať azbuku (cyriliku)."}), 400
+
+        
         text_hash = generate_text_hash(text)
         cached_result = cache.get(text_hash)
         if cached_result:
