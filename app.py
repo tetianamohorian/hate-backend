@@ -104,6 +104,29 @@ def get_history():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@app.route("/api/history/raw", methods=["GET"])
+def get_raw_history():
+    try:
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                content = f.read()
+            return Response(content, mimetype="application/json")
+        else:
+            return jsonify({"error": "history.json not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/history/reset", methods=["POST"])
+def reset_history():
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump([], f, ensure_ascii=False, indent=2)
+        return jsonify({"message": "History reset successful."}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
